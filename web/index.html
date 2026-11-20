@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>試験シミュレーター</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wall: #EEF0FA;      /* レッスン室の壁 */
+    --ink: #1F2140;       /* 文字 */
+    --ink-soft: #5A5E86;
+    --line: #CDD1EA;
+    --active: #FF4F7B;    /* アクティブカード */
+    --mental: #1FB5C2;    /* メンタルカード */
+    --good: #FF9A1F;      /* 好調 */
+    --perfect: #D7268F;   /* 絶好調 */
+    --focus: #4A4FD8;     /* 集中 */
+    --paper: #FFFFFF;
+    --display: "Dela Gothic One", "Hiragino Kaku Gothic StdN", "Yu Gothic", sans-serif;
+    --body: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--wall);
+    color: var(--ink);
+    font-family: var(--body);
+    font-weight: 500;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+  .app {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 20px 16px 28px;
+    display: grid;
+    gap: 18px;
+  }
+
+  /* ---------- ターンとスコア ---------- */
+  .stage {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 12px;
+  }
+  .turn-label { font-size: 13px; color: var(--ink-soft); margin: 0 0 6px; }
+  .turn-label strong { font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--ink); }
+  .lamps { display: flex; gap: 7px; list-style: none; margin: 0; padding: 0; }
+  .lamps li {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--ink-soft);
+  }
+  .lamps li.done { background: var(--ink); border-color: var(--ink); }
+  .lamps li.now {
+    background: var(--good); border-color: var(--good);
+    box-shadow: 0 0 0 4px rgba(255,154,31,.25), 0 0 14px rgba(255,154,31,.7);
+  }
+  .score { text-align: right; }
+  .score span { display: block; font-size: 13px; color: var(--ink-soft); }
+  .score output {
+    display: block;
+    font-family: var(--display);
+    font-size: 56px;
+    line-height: 1;
+    letter-spacing: .01em;
+    transform: skewX(-8deg);
+    transform-origin: right bottom;
+  }
+  .score output.bump { animation: bump .5s ease-out; }
+  @keyframes bump { 0% { color: var(--active); transform: skewX(-8deg) scale(1.12); } 100% { transform: skewX(-8deg) scale(1); } }
+
+  /* ---------- 体力・元気・バフ ---------- */
+  .vitals {
+    background: var(--paper);
+    border-radius: 18px;
+    padding: 14px 16px;
+    display: grid;
+    gap: 12px;
+  }
+  .hp-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+  .hp-row label { font-weight: 700; }
+  .bar { height: 12px; border-radius: 6px; background: var(--wall); overflow: hidden; position: relative; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; background: var(--ink); border-radius: 6px; transition: width .35s ease; }
+  .bar > b { position: absolute; inset: 0 auto 0 0; background: var(--mental); opacity: .55; border-radius: 6px; transition: width .35s ease; }
+  .hp-num { font-family: var(--display); font-size: 18px; min-width: 64px; text-align: right; }
+  .hp-num small { font-family: var(--body); font-size: 12px; color: var(--ink-soft); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    padding: 3px 12px 3px 10px;
+    border-radius: 999px;
+    border: 2px solid var(--line);
+    color: var(--ink-soft);
+  }
+  .chip b { font-family: var(--display); font-weight: 400; font-size: 17px; }
+  .chip.on { border-color: transparent; color: #fff; }
+  .chip.genki.on { background: var(--mental); }
+  .chip.good.on { background: var(--good); }
+  .chip.perfect.on { background: var(--perfect); }
+  .chip.focus.on { background: var(--focus); }
+
+  /* ---------- 予測 ---------- */
+  .preview {
+    min-height: 54px;
+    display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 14px;
+    text-align: center;
+    color: var(--ink-soft);
+  }
+  .preview .gain { font-family: var(--display); font-size: 30px; color: var(--active); }
+  .preview .delta { font-size: 14px; }
+  .preview .delta.minus { color: var(--ink); }
+  .preview .warn { color: var(--perfect); font-weight: 700; }
+
+  /* ---------- 手札 ---------- */
+  .hand {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 10px;
+    min-height: 210px;
+    align-items: end;
+  }
+  .card {
+    position: relative;
+    display: flex; flex-direction: column;
+    min-height: 196px;
+    padding: 0 0 10px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--paper);
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 2px 0 var(--line);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .card .band { height: 46px; border-radius: 14px 14px 0 0; position: relative; }
+  .card.active .band { background: var(--active); }
+  .card.mental .band { background: var(--mental); }
+  .card .cost {
+    position: absolute; left: 8px; top: 8px;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--paper); color: var(--ink);
+    display: grid; place-items: center;
+    font-family: var(--display); font-size: 17px;
+  }
+  .card .cost.hp { background: var(--ink); color: #fff; }
+  .card .once {
+    position: absolute; right: 8px; top: 12px;
+    font-size: 11px; font-weight: 700; color: #fff;
+    border: 1.5px solid rgba(255,255,255,.85); border-radius: 4px; padding: 0 5px;
+  }
+  .card h3 { margin: 10px 10px 4px; font-size: 14px; font-weight: 700; line-height: 1.35; }
+  .card p { margin: 0 10px; font-size: 12px; line-height: 1.55; color: var(--ink-soft); }
+  .card .reason { margin-top: auto; padding-top: 6px; font-size: 11px; font-weight: 700; color: var(--perfect); }
+  .card[aria-disabled="true"] { cursor: not-allowed; }
+  .card[aria-disabled="true"] .band { filter: grayscale(1) opacity(.45); }
+  .card[aria-disabled="true"] h3, .card[aria-disabled="true"] p:not(.reason) { opacity: .55; }
+  .card[aria-pressed="true"] {
+    transform: translateY(-16px);
+    box-shadow: 0 0 0 3px var(--ink), 0 14px 22px rgba(31,33,64,.18);
+  }
+  .card:hover:not([aria-disabled="true"]):not([aria-pressed="true"]) { transform: translateY(-5px); }
+
+  /* ---------- 行動 ---------- */
+  .actions { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; }
+  .btn {
+    border: 0; border-radius: 12px; padding: 14px 12px;
+    font-weight: 700; font-size: 16px; cursor: pointer;
+  }
+  .btn.rest { background: var(--paper); box-shadow: inset 0 0 0 2px var(--line); }
+  .btn.rest small { display: block; font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+  .btn.use { background: var(--ink); color: #fff; font-size: 18px; }
+  .btn.use:disabled { background: var(--line); color: var(--ink-soft); cursor: not-allowed; }
+
+  /* ---------- 山札など ---------- */
+  .piles { display: flex; gap: 8px; justify-content: center; }
+  .pile {
+    border: 0; background: transparent; cursor: pointer;
+    padding: 6px 10px; border-radius: 8px; color: var(--ink-soft);
+  }
+  .pile b { font-family: var(--display); font-weight: 400; font-size: 18px; color: var(--ink); margin-left: 4px; }
+  .pile:hover { background: rgba(31,33,64,.06); }
+
+  .log { font-size: 13px; color: var(--ink-soft); }
+  .log summary { cursor: pointer; font-weight: 700; color: var(--ink); }
+  .log ol { margin: 8px 0 0; padding-left: 1.4em; max-height: 180px; overflow: auto; }
+
+  .seed { display: flex; gap: 8px; align-items: center; justify-content: center; font-size: 13px; color: var(--ink-soft); }
+  .seed input { width: 110px; padding: 6px 8px; border: 2px solid var(--line); border-radius: 8px; font: inherit; background: var(--paper); color: var(--ink); }
+  .seed button { border: 0; background: transparent; text-decoration: underline; cursor: pointer; color: var(--ink); padding: 6px; }
+
+  /* ---------- ダイアログ ---------- */
+  dialog { border: 0; border-radius: 18px; padding: 20px; width: min(92vw, 440px); color: var(--ink); }
+  dialog::backdrop { background: rgba(31,33,64,.45); }
+  dialog h2 { margin: 0 0 10px; font-size: 18px; }
+  dialog ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+  dialog li { display: flex; gap: 8px; align-items: baseline; }
+  dialog li i { width: 10px; height: 10px; border-radius: 50%; flex: none; transform: translateY(1px); }
+  dialog li small { color: var(--ink-soft); }
+  dialog .close { margin-top: 14px; width: 100%; }
+  .final { text-align: center; }
+  .final output { display: block; font-family: var(--display); font-size: 64px; line-height: 1.1; transform: skewX(-8deg); margin: 6px 0 4px; }
+  .final p { margin: 0 0 16px; color: var(--ink-soft); }
+  .final .btn { width: 100%; margin-top: 8px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px;
+  }
+
+  @media (min-width: 960px) {
+    .app { max-width: 600px; padding-top: 36px; }
+    .score output { font-size: 64px; }
+    .card { min-height: 200px; }
+    .hand { min-height: 216px; }
+  }
+  @media (max-width: 420px) {
+    .card h3 { font-size: 13px; }
+    .card p { font-size: 11px; }
+    .hand { gap: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .card[aria-pressed="true"] { transform: none; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="stage">
+    <div>
+      <p class="turn-label">ターン <strong id="turn">-</strong> / <span id="maxTurn">-</span></p>
+      <ol class="lamps" id="lamps" aria-label="ターンの進み具合"></ol>
+    </div>
+    <div class="score">
+      <span>スコア</span>
+      <output id="score">0</output>
+    </div>
+  </header>
+
+  <section class="vitals" aria-label="アイドルの状態">
+    <div class="hp-row">
+      <label for="hpBar">体力</label>
+      <div class="bar" id="hpBar" role="meter" aria-valuemin="0"><i id="hpFill"></i><b id="genkiFill"></b></div>
+      <span class="hp-num"><span id="hp">0</span><small> / <span id="maxHp">0</span></small></span>
+    </div>
+    <div class="chips">
+      <span class="chip genki" id="chipGenki">元気 <b>0</b></span>
+      <span class="chip good" id="chipGood">好調 <b>0</b></span>
+      <span class="chip perfect" id="chipPerfect">絶好調 <b>0</b></span>
+      <span class="chip focus" id="chipFocus">集中 <b>0</b></span>
+    </div>
+  </section>
+
+  <div class="preview" id="preview" aria-live="polite">カードを選ぶと、使ったときの変化が出ます</div>
+
+  <section class="hand" id="hand" aria-label="手札"></section>
+
+  <div class="actions">
+    <button class="btn rest" id="restBtn">休む<small id="restNote">体力 +2</small></button>
+    <button class="btn use" id="useBtn" disabled>カードを使う</button>
+  </div>
+
+  <nav class="piles" aria-label="カードの置き場">
+    <button class="pile" data-pile="deck">山札<b id="deckCount">0</b></button>
+    <button class="pile" data-pile="discard">捨て札<b id="discardCount">0</b></button>
+    <button class="pile" data-pile="exile">除外<b id="exileCount">0</b></button>
+  </nav>
+
+  <details class="log">
+    <summary>これまでの行動</summary>
+    <ol id="log"></ol>
+  </details>
+
+  <form class="seed" id="seedForm">
+    <label for="seedInput">シード値</label>
+    <input id="seedInput" inputmode="numeric" pattern="[0-9]*">
+    <button type="submit">この値で始め直す</button>
+  </form>
+</main>
+
+<dialog id="pileDialog">
+  <h2 id="pileTitle"></h2>
+  <ul id="pileList"></ul>
+  <button class="btn rest close" id="pileClose">閉じる</button>
+</dialog>
+
+<dialog id="endDialog" class="final">
+  <h2>試験終了</h2>
+  <output id="finalScore">0</output>
+  <p id="finalSeed"></p>
+  <button class="btn use" id="againBtn">同じシード値でもう一度</button>
+  <button class="btn rest" id="newBtn">新しい試験を始める</button>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let state = null;
+let selected = null;   // 選んでいるカードの uid
+let busy = false;
+
+const pileNames = { deck: "山札", discard: "捨て札", exile: "除外" };
+
+async function api(method, path) {
+  const res = await fetch(path, { method });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "サーバーとの通信に失敗しました");
+  return data;
+}
+
+function toast(message) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.setAttribute("role", "status");
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+function signed(v) { return v === 0 ? "±0" : (v > 0 ? "+" : "") + v; }
+
+function renderPreview() {
+  const box = $("preview");
+  const card = state.hand.find((c) => c.uid === selected);
+  if (!card) {
+    box.textContent = state.ended ? "" : "カードを選ぶと、使ったときの変化が出ます";
+    return;
+  }
+  const p = card.preview;
+  const parts = [];
+  parts.push(`<span class="gain">スコア ${signed(p.score)}</span>`);
+  const rows = [["体力", p.hp], ["元気", p.genki], ["好調", p.good_condition], ["絶好調", p.perfect_condition], ["集中", p.concentration]];
+  for (const [name, v] of rows) {
+    if (v !== 0) parts.push(`<span class="delta ${v < 0 ? "minus" : ""}">${name} ${signed(v)}</span>`);
+  }
+  box.innerHTML = parts.join("");
+}
+
+function renderHand() {
+  const hand = $("hand");
+  hand.innerHTML = "";
+  state.hand.forEach((c, i) => {
+    const btn = document.createElement("button");
+    btn.className = `card ${c.type}`;
+    btn.setAttribute("aria-pressed", String(c.uid === selected));
+    btn.setAttribute("aria-disabled", String(!c.usable));
+    btn.setAttribute("aria-label", `${i + 1}番 ${c.name} コスト${c.cost} ${c.text}${c.usable ? "" : " " + c.reason}`);
+    btn.innerHTML = `
+      <div class="band">
+        <span class="cost ${c.cost_type === "hp" ? "hp" : ""}" title="${c.cost_type === "hp" ? "体力から直接払うコスト" : "コスト"}">${c.cost}</span>
+        ${c.once ? '<span class="once" title="試験中に1回だけ使えます">1回</span>' : ""}
+      </div>
+      <h3></h3>
+      <p></p>
+      ${c.usable ? "" : '<p class="reason"></p>'}`;
+    btn.querySelector("h3").textContent = c.name;
+    btn.querySelector("p").textContent = c.text;
+    if (!c.usable) btn.querySelector(".reason").textContent = c.reason;
+    btn.addEventListener("click", () => onCardClick(c));
+    hand.appendChild(btn);
+  });
+}
+
+function render() {
+  const s = state;
+  $("turn").textContent = Math.min(s.turn, s.max_turn);
+  $("maxTurn").textContent = s.max_turn;
+
+  const lamps = $("lamps");
+  lamps.innerHTML = "";
+  for (let t = 1; t <= s.max_turn; t++) {
+    const li = document.createElement("li");
+    if (t < s.turn) li.className = "done";
+    else if (t === s.turn && !s.ended) li.className = "now";
+    li.title = `ターン${t}`;
+    lamps.appendChild(li);
+  }
+
+  const scoreEl = $("score");
+  if (scoreEl.textContent !== String(s.score)) {
+    scoreEl.textContent = s.score;
+    scoreEl.classList.remove("bump");
+    void scoreEl.offsetWidth;
+    scoreEl.classList.add("bump");
+  }
+
+  $("hp").textContent = s.hp;
+  $("maxHp").textContent = s.max_hp;
+  $("hpFill").style.width = `${(s.hp / s.max_hp) * 100}%`;
+  $("genkiFill").style.width = `${Math.min(s.genki / s.max_hp, 1) * 100}%`;
+  $("hpBar").setAttribute("aria-valuemax", s.max_hp);
+  $("hpBar").setAttribute("aria-valuenow", s.hp);
+
+  const chips = [["chipGenki", s.genki], ["chipGood", s.good_condition], ["chipPerfect", s.perfect_condition], ["chipFocus", s.concentration]];
+  for (const [id, v] of chips) {
+    $(id).querySelector("b").textContent = v;
+    $(id).classList.toggle("on", v > 0);
+  }
+
+  if (!s.hand.some((c) => c.uid === selected && c.usable)) selected = null;
+  renderHand();
+  renderPreview();
+
+  $("restNote").textContent = `体力 +${s.rest_heal}`;
+  $("restBtn").disabled = s.ended;
+  $("useBtn").disabled = selected === null || s.ended;
+  $("deckCount").textContent = s.deck.length;
+  $("discardCount").textContent = s.discard.length;
+  $("exileCount").textContent = s.exile.length;
+
+  const log = $("log");
+  log.innerHTML = "";
+  for (const line of s.log) {
+    const li = document.createElement("li");
+    li.textContent = line;
+    log.appendChild(li);
+  }
+  log.scrollTop = log.scrollHeight;
+
+  if (document.activeElement !== $("seedInput")) $("seedInput").value = s.seed;
+
+  if (s.ended) {
+    $("finalScore").textContent = s.score;
+    $("finalSeed").textContent = `シード値 ${s.seed}`;
+    if (!$("endDialog").open) $("endDialog").showModal();
+  }
+}
+
+function onCardClick(card) {
+  if (state.ended || busy) return;
+  if (!card.usable) {
+    toast(card.reason);
+    return;
+  }
+  if (selected === card.uid) {
+    useSelected();       // 選んでいるカードをもう一度押すと使う
+    return;
+  }
+  selected = card.uid;
+  render();
+}
+
+async function run(method, path) {
+  if (busy) return;
+  busy = true;
+  try {
+    state = await api(method, path);
+    render();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    busy = false;
+  }
+}
+
+function useSelected() {
+  if (selected === null) return;
+  const uid = selected;
+  selected = null;
+  run("POST", `/api/use?uid=${uid}`);
+}
+
+$("useBtn").addEventListener("click", useSelected);
+$("restBtn").addEventListener("click", () => { selected = null; run("POST", "/api/rest"); });
+
+$("seedForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const v = $("seedInput").value.trim();
+  if (!/^[0-9]+$/.test(v)) { toast("シード値は0以上の整数で入力してください"); return; }
+  selected = null;
+  run("POST", `/api/new?seed=${v}`);
+});
+
+$("againBtn").addEventListener("click", () => { $("endDialog").close(); selected = null; run("POST", `/api/new?seed=${state.seed}`); });
+$("newBtn").addEventListener("click", () => { $("endDialog").close(); selected = null; run("POST", "/api/new"); });
+
+document.querySelectorAll(".pile").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.dataset.pile;
+    const cards = state[key];
+    $("pileTitle").textContent = `${pileNames[key]}(${cards.length}枚)`;
+    const list = $("pileList");
+    list.innerHTML = "";
+    if (cards.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = "カードはありません";
+      list.appendChild(li);
+    }
+    for (const c of cards) {
+      const li = document.createElement("li");
+      li.innerHTML = `<i style="background:var(--${c.type})"></i><span></span><small></small>`;
+      li.querySelector("span").textContent = c.name;
+      li.querySelector("small").textContent = c.text;
+      list.appendChild(li);
+    }
+    $("pileDialog").showModal();
+  });
+});
+$("pileClose").addEventListener("click", () => $("pileDialog").close());
+
+// キーボード操作: 1〜5 でカードを選ぶ、Enter で使う、0 で休む
+document.addEventListener("keydown", (e) => {
+  if (!state || state.ended || document.querySelector("dialog[open]")) return;
+  if (e.target.tagName === "INPUT") return;
+  if (e.key >= "1" && e.key <= "5") {
+    const card = state.hand[Number(e.key) - 1];
+    if (card) onCardClick(card);
+  } else if (e.key === "0") {
+    $("restBtn").click();
+  } else if (e.key === "Enter" && selected !== null && !e.target.closest("button")) {
+    useSelected();
+  }
+});
+
+run("GET", "/api/state");
+</script>
+</body>
+</html>

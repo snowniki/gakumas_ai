@@ -1,0 +1,5 @@
+key,value,note
+max_turn,8,仮の値。実際の試験で確認する
+max_hp,30,仮の値
+start_hp,30,仮の値
+score_bonus_percent,100,スコアボーナス×100。最初は1.0倍で計算する

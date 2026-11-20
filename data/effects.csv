@@ -1,0 +1,17 @@
+id,name,plus,order,kind,value,times,concentration_rate,condition
+free_010,アピールの基本,no,1,param,9,1,1,none
+free_011,ポーズの基本,no,1,param,2,1,1,none
+free_011,ポーズの基本,no,2,genki,2,1,1,none
+free_012,表現の基本,no,1,genki,4,1,1,none
+sense_072,振る舞いの基本,no,1,genki,1,1,1,none
+sense_072,振る舞いの基本,no,2,good_condition,2,1,1,none
+sense_073,表情の基本,no,1,genki,1,1,1,none
+sense_073,表情の基本,no,2,concentration,2,1,1,none
+sense_066,挑戦,no,0,use_condition,0,1,1,good_condition
+sense_066,挑戦,no,1,param,25,1,1,none
+sense_067,試行錯誤,no,1,param,8,2,1,none
+sense_050,ハイタッチ,no,1,param,17,1,1.5,none
+sense_051,トークタイム,no,0,use_condition,0,1,1,good_condition
+sense_051,トークタイム,no,1,param,27,1,1,none
+sense_049,勢い任せ,no,1,param,6,1,1,none
+sense_049,勢い任せ,no,2,concentration,3,1,1,good_condition

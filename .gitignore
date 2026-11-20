@@ -1,0 +1,7 @@
+# ビルドでできるファイル
+*.exe
+*.o
+gakumas
+test_examples
+server
+build/
